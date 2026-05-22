@@ -28,9 +28,10 @@ dev = [
 requires = ["uv_build>=0.9.18,<0.10"]
 build-backend = "uv_build"
 
-[tool.uv]
-# Public PyPI is the default for local dev. The GitLab CI publish template
-# authenticates to the Ginkgo Artifact Registry separately at release time.
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
 
 [tool.ruff]
 line-length = 100
