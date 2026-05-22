@@ -17,6 +17,20 @@ scored gene set, predict a single number: `expression(c, g)`.
 "Expression" here is the **mean of** `log2(CPM + 1)` **across replicates of**
 `(c, g)`, where CPM is `1e6 * count_g / total_counts_sample`.
 
+## Setup
+
+To run the examples below, you'll need to install this package and
+[vcpi-client](https://github.com/virtualcell-vcpi/vcpi-client). See the client's
+README for information on setting the token. You can install them in a
+[uv](https://docs.astral.sh/uv/) project as follows:
+
+```shell
+# Make a folder with a pyproject.toml and `cd` into it
+uv init --bare my-vcpi-repo && cd my-vcpi-repo
+# Install the two packages from Github
+uv add git+https://github.com/virtualcell-vcpi/vcpi-prediction-contest-2026.git
+uv add git+https://github.com/virtualcell-vcpi/vcpi-client.git
+```
 
 ## Scoring metric
 
@@ -25,6 +39,7 @@ predicted and true expression vectors. Lower is better, 0 is
 perfect.
 
 ### Weights
+
 Per-compound, per-gene weights are used to reward algorithms that more accurately predict the expression of genes that are different compared to the average of the rest of the training data for a given compound. They are calculated following [Meija’s preprint](https://arxiv.org/abs/2506.22641). Briefly, we calculate the t-statistic vs the rest of the compounds for each gene for each compound, minmax it, square it and renormalize so the column sums to 1. We provide these for each (gene, compound) pair.
 
 ### wMSE results on simple models
@@ -157,7 +172,6 @@ gene_filter_path()                     # filesystem Path to gene_filter.csv
 | `smiles`                      | canonical SMILES                                                                                                                            |
 | `inchi_key`                   | computed InChIKey                                                                                                                           |
 
-
 `gene_filter.csv` has a single `gene_id` column listing the Ensembl
 IDs of the scored genes. These are just the genes with mean CPM >=1 across the training samples.
 
@@ -248,3 +262,52 @@ print(per_compound.head())
 
 If you omit `weights`, the function derives them from the truth
 file itself (variance-of-truth weights). If you want to score the same way the leaderboard does at the end, pass in the Meija pre-calculated weights.
+
+### Example Scoring
+
+Run this after the code in "Getting the training data" to score a dummy set of predictions based on the real counts.
+
+```python
+import pandas as pd
+from numpy.random import default_rng
+from vcpi_prediction_contest import (
+    aggregate_leaderboards,
+    counts_to_expression,
+    load_gene_filter,
+    score_compounds,
+)
+
+metadata = pd.read_parquet('train_metadata.parquet')
+# Sample 10 compounds
+compounds = (
+    metadata.query('~is_control').user_compound_id.drop_duplicates().sample(10, random_state=42)
+)
+# Read in the counts for those compounds
+counts = pd.read_parquet(
+    'train_counts.parquet',
+    columns=[
+        'gene_id',
+        *metadata.query('user_compound_id in @compounds')['sequenced_id'].astype(str).tolist(),
+    ],
+)
+
+# Generate ground truth expression data with a subset of samples
+expression = counts_to_expression(counts, metadata, compound_col='user_compound_id')
+truth = expression.rename(columns={'user_compound_id': 'compound'})
+
+# Loop over different levels of noise and score predictions
+weights = pd.read_parquet('weights.parquet')
+genes = load_gene_filter()  # bundled scored gene set
+mean = truth['expression'].mean()
+std = truth['expression'].std()
+
+noise_factors = [0, 1, 2]  # no noise, noise, 2*noise
+
+for factor in noise_factors:
+    pred = truth.rename(columns={'expression': 'predicted_expression'}).copy()
+    noise = default_rng().uniform(-std, std, size=len(pred)) * factor if factor > 0 else 0
+    pred['predicted_expression'] = pred['predicted_expression'] + noise
+    per_compound = score_compounds(truth, pred, gene_filter=genes, weights=weights)
+    board = aggregate_leaderboards(per_compound)
+    print(f'Noise factor {factor}, score: {board["wmse_mean"]:.4f}')
+```
