@@ -1,0 +1,85 @@
+[project]
+name = "vcpi-prediction-contest"
+version = "0.1.0"
+description = "Scoring for the VCPI compound expression-prediction contest."
+readme = "README.md"
+authors = [
+    {name = "Rory Kirchner", email = "rkirchner@ginkgobioworks.com"}
+]
+requires-python = ">=3.11"
+
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=16",
+    "loguru>=0.7",
+    "requests>=2.31",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Public PyPI is the default for local dev. The GitLab CI publish template
+# authenticates to the Ginkgo Artifact Registry separately at release time.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN201", "ANN204",
+    "INP001", "T201", "RET504",
+    "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",
+    "D200", "D401", "E402", "E501", "F401",
+    "TRY003",
+    "W191", "E111", "E114", "E117", "D206", "D300",
+    "Q000", "Q001", "Q002", "Q003",
+    "COM812", "COM819", "ISC001", "ISC002",
+    "PLR0913",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 18
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = [
+    "S101", "S102", "S106", "S603", "S607", "PGH001", "ANN001", "ANN201", "ANN202", "ARG001",
+    "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",
+    "D205", "D209",
+    "PLR2004", "PERF401", "F841", "RUF002",
+    "SLF001",
+    "TC003",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.bumpversion]
+current_version = "0.1.0"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "README.md"
+search = "Version: {current_version}"
+replace = "Version: {new_version}"
